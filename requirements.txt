@@ -5,6 +5,8 @@ invoke>=0.6
 path.py
 pyactiveresource
 python-sql>=0.2
+psycopg2
+psutil
 
 -e hg+https://bitbucket.org/DavidVilla/python-bitbucket-api#egg=bitbucket-api
 # bitbucket-api dependencies

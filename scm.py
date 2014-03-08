@@ -32,13 +32,16 @@ def get_repo(section, config, function=None):
     return repository
 
 def get_virtualenv():
+    if os.environ.get('VIRTUAL_ENV'):
+        return ''
     return os.path.join(os.path.dirname(__file__), 'virtual-env.sh')
 
 
 @task()
 def add2virtualenv():
 
-    aux = run(get_virtualenv() + ' lssitepackages', hide=True)
+    virtualenv = get_virtualenv()
+    aux = run(virtualenv + ' lssitepackages', hide=True)
     Config = read_config_file()
     for section in Config.sections():
         if not Config.has_option(section, 'add2virtualenv'):
@@ -47,7 +50,7 @@ def add2virtualenv():
         project_path = os.path.dirname(__file__).split('tasks')[-1]
         abspath = os.path.join(project_path, repo_path, section)
         if not abspath in str(aux):
-            run(get_virtualenv() + ' add2virtualenv ' + abspath)
+            run(virtualenv + ' add2virtualenv ' + abspath)
 
 
 @task()
@@ -131,7 +134,7 @@ def wait_processes(processes, maximum=MAX_PROCESSES):
 
 
 def hg_clone(url, path, branch="default"):
-    command = 'hg clone -r %s -q %s %s' % (branch, url, path)
+    command = 'hg clone -b %s -q %s %s' % (branch, url, path)
     try:
         run(command)
     except:
@@ -552,6 +555,39 @@ def git_pull(module, path, update):
     os.chdir(cwd)
 
 
+@task()
+def branch(branch, clean=False, config=None, unstable=True):
+    print t.bold('Reverting patches...')
+    bashCommand = ['quilt', 'pop', '-fa']
+    output, err = execBashCommand(bashCommand)
+    Config = read_config_file(config, unstable=unstable)
+
+    processes = []
+    p = None
+    for section in Config.sections():
+        repo = Config.get(section, 'repo')
+        path = Config.get(section, 'path')
+        if repo == 'git':
+            continue
+        if repo != 'hg':
+            print >> sys.stderr, "Not developed yet"
+            continue
+        p = Process(target=hg_update, args=(section, path, clean, branch))
+        p.start()
+        processes.append(p)
+        wait_processes(processes)
+    wait_processes(processes, 0)
+
+    print t.bold('Applying patches...')
+    bashCommand = ['quilt', 'push', '-a']
+    output, err = execBashCommand(bashCommand)
+    if not err:
+        print output
+    else:
+        print "It's not possible to apply patche(es)"
+        print err
+
+
 @task
 def pull(config=None, unstable=True, update=True):
     Config = read_config_file(config, unstable=unstable)
@@ -574,7 +610,7 @@ def pull(config=None, unstable=True, update=True):
     wait_processes(processes, 0)
 
 
-def hg_update(module, path, clean):
+def hg_update(module, path, clean, branch=None):
     path_repo = os.path.join(path, module)
     if not os.path.exists(path_repo):
         print >> sys.stderr, t.red("Missing repositori:") + t.bold(path_repo)
@@ -588,9 +624,15 @@ def hg_update(module, path, clean):
         cmd.append('-C')
     else:
         cmd.append('-y')  # noninteractive
+
+    if branch:
+        cmd.extend(['-r', branch])
     result = run(' '.join(cmd), warn=True, hide='both')
 
     if not result.ok:
+        if branch is not None and u'abort: unknown revision' in result.stderr:
+            os.chdir(cwd)
+            return
         print >> sys.stderr, t.red("= " + module + " = KO!")
         print >> sys.stderr, result.stderr
         os.chdir(cwd)
