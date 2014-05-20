@@ -198,7 +198,7 @@ def build(filename=None):
     print "Building %s..." % filename
     with open(filename, 'r') as f:
         for line in f:
-            if line:
+            if line and not line.strip().startswith('#'):
                 print t.bold(line)
                 eval(line)
 
@@ -1013,6 +1013,12 @@ def process_customer_invoices():
             ('state', '=', 'draft'),
             ])
     invoices = random.sample(invoices, int(0.9 * len(invoices)))
+    for invoice in invoices:
+        # TODO: For consistency, better use the date of the maximum
+        # date of the # sales composing the lines of the invoice
+        invoice.invoice_date = random_datetime(
+            TODAY + relativedelta(months=-12), TODAY)
+        invoice.save()
 
     Invoice.post([x.id for x in invoices], config.context)
     gal_commit()
