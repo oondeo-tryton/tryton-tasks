@@ -13,6 +13,7 @@ import tryton_component
 import project
 import bbucket
 import userdoc
+import quilt
 
 ns.add_collection(BootstrapCollection, 'bs')
 ns.add_collection(Collection.from_module(utils))
@@ -26,5 +27,6 @@ ns.add_collection(Collection.from_module(tryton_component), 'component')
 ns.add_collection(Collection.from_module(project), 'project')
 ns.add_collection(Collection.from_module(bbucket), 'bb')
 ns.add_collection(Collection.from_module(userdoc), 'doc')
+ns.add_collection(Collection.from_module(quilt))
 
 

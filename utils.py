@@ -5,6 +5,7 @@ import sys
 from blessings import Terminal
 from invoke import task
 from path import path
+import subprocess
 
 try:
     from proteus import config, Wizard, Model
@@ -129,6 +130,9 @@ def update_parent_left_right(database, table, field, host='localhost',
 @task
 def prepare_translations(database, langs=None, host=None, port=None,
         dbuser=None, dbpassword=None):
+    """
+    Runs the set, clean and update wizards in the given database.
+    """
     print t.bold('export_translations: %s, %s') % (database, langs)
     if not _check_database(database, host, port, dbuser, dbpassword):
         return
@@ -167,6 +171,12 @@ def prepare_translations(database, langs=None, host=None, port=None,
 @task
 def export_translations(database, modules, langs=None,
         host=None, port=None, dbuser=None, dbpassword=None):
+    """
+    Creates translation files for the given modules and the specified languages.
+
+    If no languages are specified, the ones marked as translatable in the
+    database are used.
+    """
     print t.bold('export_translations: %s, %s, %s') % (database, modules,
         langs)
     if not _check_database(database, host, port, dbuser, dbpassword):
@@ -277,4 +287,24 @@ def _check_database(database, host=None, port=None, dbuser=None,
         print t.bold('Invalid database connection params:')
         print str(e)
         return False
+    return True
+
+
+def execBashCommand(command, success_msg="", fail_msg="", quiet=True):
+    """
+        Execute bash command.
+        @bashCommand: is list with the command and the options
+        return: list with the output and the posible error
+    """
+    process = subprocess.Popen(command, stdout=subprocess.PIPE)
+    output, err = process.communicate()
+
+    if err and fail_msg:
+        print fail_msg
+        print err
+        return False
+    if not err and success_msg:
+        print success_msg
+        if not quiet:
+            print output
     return True
