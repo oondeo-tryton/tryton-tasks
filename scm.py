@@ -137,7 +137,7 @@ def unknown(unstable=True, status=False, show=True, remove=False, quiet=False):
     return modules_wo_repo, repo_not_in_cfg
 
 
-def wait_processes(processes, maximum=MAX_PROCESSES):
+def wait_processes(processes, maximum=MAX_PROCESSES, exit_code=None):
     i = 0
     while len(processes) > maximum:
         if i >= len(processes):
@@ -147,25 +147,27 @@ def wait_processes(processes, maximum=MAX_PROCESSES):
         if p.is_alive():
             i += 1
         else:
+            if exit_code is not None:
+                exit_code.append(processes[i].exitcode)
             del processes[i]
 
 
 def hg_clone(url, path, branch="default", revision="tip"):
     command = 'hg clone -b %s -q %s %s' % (branch, url, path)
+    res = -1
     print command
     try:
-        run(command)
+        res = run(command)
     except:
         print >> sys.stderr, "Error running " + t.bold(command)
-        raise
-    print "Repo " + t.bold(path) + t.green(" Cloned")
 
     if revision != 'tip':
         print "Repo " + t.bold(path) + t.green(" Updated") + \
             " to Revision:" + revision
         print 'hg update -r %s' % revision
-        run('hg update -r %s' % revision)
+        res = run('hg update -r %s' % revision)
 
+    return res
 
 def git_clone(url, path, branch="master", revision="master"):
     command = 'git clone -b %s -q %s %s' % (branch, url, path)
@@ -190,6 +192,7 @@ def clone(config=None, unstable=True, development=False):
     Config = read_config_file(config, unstable=unstable)
     p = None
     processes = []
+    exit_code = []
     for section in Config.sections():
         repo = get_repo(section, Config, 'clone', development)
         if not os.path.exists(repo['path']):
@@ -197,8 +200,12 @@ def clone(config=None, unstable=True, development=False):
                     repo['path'], repo['branch'], repo['revision']))
             p.start()
             processes.append(p)
-            wait_processes(processes)
-    wait_processes(processes, 0)
+            wait_processes(processes, exit_code=exit_code)
+    wait_processes(processes, 0, exit_code=exit_code)
+
+    return sum(exit_code)
+
+
 
 
 def print_status(module, files):
@@ -617,7 +624,7 @@ def hg_pull(module, path, update, quiet=False, branch=None,
 
     if not os.path.exists(path):
         print >> sys.stderr, t.red("Missing repositori:") + t.bold(path)
-        return
+        return -1
 
     cwd = os.getcwd()
     os.chdir(path)
@@ -641,15 +648,16 @@ def hg_pull(module, path, update, quiet=False, branch=None,
         print >> sys.stderr, t.red("= " + module + " = KO!")
         print >> sys.stderr, result.stderr
         os.chdir(cwd)
-        return
+        return -1
 
     if "no changes found" in result.stdout or result.stdout == '':
         os.chdir(cwd)
-        return
+        return 0
 
     print t.bold("= " + module + " =")
     print result.stdout
     os.chdir(cwd)
+    return 0
 
 
 def git_pull(module, path, update):
@@ -843,14 +851,16 @@ def pull(config=None, unstable=True, update=True, development=False):
     Config = read_config_file(config, unstable=unstable)
     processes = []
     p = None
+    exit_code = []
     for section in Config.sections():
         repo = get_repo(section, Config, 'pull', development)
         p = Process(target=repo['function'], args=(section, repo['path'],
             update, repo['revision']))
         p.start()
         processes.append(p)
-        wait_processes(processes)
-    wait_processes(processes, 0)
+        wait_processes(processes, exit_code=exit_code)
+    wait_processes(processes, 0, exit_code=exit_code)
+    return sum(exit_code)
 
 
 def hg_push(module, path, url, new_branches=False):
