@@ -32,20 +32,33 @@ def print_repo(repo, detail=True):
 
 
 @task()
-def show(team='nantic'):
-    url = "https://api.bitbucket.org/2.0/teams/{teamname}/repositories"
-    url = url.format(teamname=team)
+def show(team='nantic',project=None):
+    for line in list_repos(team,project):
+        if type(line) is int:
+            print "Repositories: ", line
+        else:
+            print_repo(line)
+
+def list_repos(team='nantic',project=None):
+    #url = "https://api.bitbucket.org/2.0/teams/{teamname}/repositories"
+    url = 'https://api.bitbucket.org/2.0/repositories/{teamname}'
+    if project:
+        url += '?q=project.key="{projectname}"'
+    url = url.format(teamname=team,projectname=project)
     data = {}
     next_query = url
+    print(url)
     while next_query:
         res = get(next_query, data)
         if url == next_query:
             num_repos = res.get('size')
-            print "Repositories:", num_repos
+            #print "Repositories:", num_repos
+            yield num_repos
 
         next_query = res.get('next')
         for repo in res['values']:
-            print_repo(repo)
+            #print_repo(repo)
+            yield repo
 
 RepoCollection = Collection()
 RepoCollection.add_task(create)

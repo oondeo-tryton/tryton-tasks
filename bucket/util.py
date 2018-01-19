@@ -20,6 +20,8 @@ if path.isfile(config_file):
 
 
 def get_auth():
+    if not config.get('username'):
+        return None
     return config.get('username'), config.get('password')
 
 
