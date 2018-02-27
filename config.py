@@ -5,6 +5,8 @@ from .utils import read_config_file, get_config_files
 from .scm import get_repo
 from collections import OrderedDict
 from bucket.repository import list_repos
+from datetime import datetime
+import codecs,re
 
 def get_config():
     """ Get config file for tasks module """
@@ -86,8 +88,13 @@ def add_module(config, path, url=None):
     Config.write(cfile)
     cfile.close()
 
+def encode(s):
+    if type(s) is unicode:
+        return s.encode('ascii','ignore')
+    else:
+        return s
 
-def config_update_walk(scmtype="bucket",unstable=False):
+def config_update_walk(scmtype="bucket",unstable=False,include_arr=[],exclude_arr=[]):
     for r, _ , f in os.walk("./config/"+scmtype):
         for files in f:
             project = None
@@ -107,37 +114,66 @@ def config_update_walk(scmtype="bucket",unstable=False):
                     project = d.replace("project_","")
             user = os.path.splitext(files)[0]
             path = os.path.join(r, files)
+            exclude_file = os.path.join(r, "exclude.txt")
+            if os.path.isfile(exclude_file):
+                with f = open(exclude_file,'r'):
+                    exclude_arr += f.read().splitlines()            
+            exclude_file = os.path.join(r, user, ".exclude")
+            if os.path.isfile(exclude_file):
+                with f = open(exclude_file,'r'):
+                    exclude_arr += f.read().splitlines()
             if os.path.isfile(path):
                 # Check if file exists because it may be a symlink to
                 # ../local.cfg and it might not exist.
                 Config = ConfigParser.ConfigParser()
-                f=open(path,"r+")
-                Config.readfp(f)
                 for repo in list_repos(user,project):
                     if type(repo) is int:
                         continue
                     try:
-                        print repo
                         name = repo["name"]
+                        #If include filter is not defined all is accepted
+                        if include_arr == []:
+                            include_config = True
+                        else:
+                            include_config = False
+                        for include in include_arr:
+                            if re.match(include,name):
+                                include_config = True
+                        for exclude in exclude_arr:                                
+                            if re.match(exclude,name):
+                                include_config = False 
+                        if name.startswith("trytond-") and not name.startswith("trytond-doc"):
+                            dest_path = "./trytond/trytond/modules"
+                            name = name.replace("trytond-","")
+                        else: 
+                            dest_path = "./"+user
                         if not Config.has_section(name):
                             Config.add_section(name)
-                        if name.startswith("trytond-"):
-                            Config.set(name,"path","./trytond/trytond/modules")
-                        else: 
-                            continue
-                            Config.set(name,"path","./")                    
+                        Config.set(name,"exclude",not include_config)
+                        Config.set(name,"path",dest_path)
                         if is_unstable:
                             Config.set(name,"unstable",True)
-                        Config.set(name,"repo",repo["scm"])
-                        Config.set(name,"url",repo["links"]["clone"][0]["href"])
-                        Config.set(name,"branch",repo["mainbranch"]["name"])
-                        for key,value in repo.iteritems():
-                            if type(value) is str:
-                                Config.set(files,key,value)   
+                        Config.set(name,"repo",encode(repo["scm"]))
+                        Config.set(name,"url",encode(repo["links"]["clone"][0]["href"]))
+                        Config.set(name,"branch",encode(repo["mainbranch"]["name"]))
+                        Config.set(name,"scm",encode(repo["scm"]))
+                        if repo["website"] != "":
+                            Config.set(name,"website",encode(repo["website"]))
+                        Config.set(name,"name",encode(repo["name"]))
+                        Config.set(name,"has_wiki",encode(repo["has_wiki"]))
+                        Config.set(name,"created_on",encode(datetime.strptime(repo["created_on"][0:-6],'%Y-%m-%dT%H:%M:%S.%f')))
+                        Config.set(name,"updated_on",encode(datetime.strptime(repo["updated_on"][0:-6],'%Y-%m-%dT%H:%M:%S.%f')))
+                        Config.set(name,"has_issues",encode(repo["has_issues"]))
+                        Config.set(name,"size",encode(repo["size"]))
+                        if repo["description"] != "":
+                            Config.set(name,"description",encode(repo["description"]))
+ 
                     except Exception as e:
                         print e 
+                        print name
                         if Config.has_section(name):   
                             Config.remove_section(name)
+                f=open(path,"w+")
                 Config.write(f)
                 f.close()
   

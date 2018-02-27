@@ -253,6 +253,8 @@ def clone(config=None, unstable=True, development=False):
     p = Pool(MAX_PROCESSES)
     repos = []
     for section in Config.sections():
+        if config.get(section, 'exclude'):
+            continue
         repo = get_repo(section, Config, 'clone', development)
         if not os.path.exists(repo['path']):
             repo = get_repo(section, Config, 'clone', development)
@@ -1089,6 +1091,8 @@ def pull(config=None, unstable=True, update=True, development=False,
     repos = []
     for section in Config.sections():
         # TODO: provably it could be done with a wrapper
+        if config.get(section, 'exclude'):
+            continue
         repo = get_repo(section, Config, 'pull', development)
         repo['update'] = update
         repo['ignore_missing'] = ignore_missing

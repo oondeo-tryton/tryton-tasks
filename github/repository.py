@@ -4,13 +4,15 @@ from .util import post, get, prettyprint
 
 
 @task()
-def create(name, owner, private=False, description=''):
+def create(name, owner=None, private=False, description=''):
 
-    url = "https://api.bitbucket.org/2.0/repositories/{owner}/{name}"
-    url = url.format(owner=owner, name=name)
+    if owner:
+        url = "https://api.github.com/orgs/{owner}/repos"
+        url = url.format(owner=owner)
+    else:
+        url = "https://api.github.com/user/repos"
 
     data = {
-        'scm': "hg",
         'name': name,
         'is_private': private,
         'description': description,
@@ -41,14 +43,21 @@ def show(team='nantic',project=None):
 
 def list_repos(team='nantic',project=None):
     #url = "https://api.bitbucket.org/2.0/teams/{teamname}/repositories"
-    url = 'https://api.bitbucket.org/2.0/repositories/{teamname}'
-    if project:
-        url += '?q=project.key="{projectname}"'
+    url = 'https://api.github.com/users/{teamname}/repos'
+    #if project:
+    #    url += '?q=project.key="{projectname}"'
     url = url.format(teamname=team,projectname=project)
     data = {}
-    next_query = url
-    while next_query:
+    #next_query = url
+    while True:
         res = get(next_query, data)
+        try:
+            for i in res.iteritems():
+                if num_repos == 0:
+                    yield num_repos
+                num_repos += 1
+        except:
+            break
         if url == next_query:
             num_repos = res.get('size')
             #print "Repositories:", num_repos
